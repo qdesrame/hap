@@ -1,18 +1,6 @@
 package hap
 
 import (
-	"sync"
-	"time"
-
-	"github.com/brutella/dnssd"
-	"github.com/brutella/hap/accessory"
-	"github.com/brutella/hap/characteristic"
-	"github.com/brutella/hap/log"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
-	"github.com/xiam/to"
-	godiacritics "gopkg.in/Regis24GmbH/go-diacritics.v2"
-
 	"bytes"
 	"context"
 	"crypto/sha512"
@@ -24,6 +12,18 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/brutella/dnssd"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/xiam/to"
+	godiacritics "gopkg.in/Regis24GmbH/go-diacritics.v2"
+
+	"github.com/brutella/hap/accessory"
+	"github.com/brutella/hap/characteristic"
+	"github.com/brutella/hap/log"
 )
 
 // A server handles incoming HTTP request for an accessory.
@@ -126,7 +126,7 @@ func NewServer(store Store, a *accessory.A, as ...*accessory.A) (*Server, error)
 
 	arr := []*accessory.A{a}
 	arr = append(arr, as[:]...)
-	if err := s.add(arr); err != nil {
+	if err := s.Add(arr); err != nil {
 		return nil, err
 	}
 
@@ -266,7 +266,7 @@ func (s *Server) listenAndServe(ctx context.Context) error {
 	return err
 }
 
-func (s *Server) add(as []*accessory.A) error {
+func (s *Server) Add(as []*accessory.A) error {
 	aid := uint64(1)
 	for _, a := range as {
 		if a.Name() == "" {

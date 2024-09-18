@@ -1,16 +1,16 @@
 package hap
 
 import (
+	"encoding/json"
+	"net/http"
+	"strings"
 	"time"
+
+	"github.com/xiam/to"
 
 	"github.com/brutella/hap/accessory"
 	"github.com/brutella/hap/characteristic"
 	"github.com/brutella/hap/log"
-	"github.com/xiam/to"
-
-	"encoding/json"
-	"net/http"
-	"strings"
 )
 
 type characteristicData struct {
@@ -45,8 +45,8 @@ type putCharacteristicData struct {
 	Response *bool `json:"r,omitempty"`
 }
 
-func (srv *Server) getCharacteristics(res http.ResponseWriter, req *http.Request) {
-	if !srv.IsAuthorized(req) {
+func (s *Server) getCharacteristics(res http.ResponseWriter, req *http.Request) {
+	if !s.IsAuthorized(req) {
 		log.Info.Printf("request from %s not authorized\n", req.RemoteAddr)
 		JsonError(res, JsonStatusInsufficientPrivileges)
 		return
@@ -77,7 +77,7 @@ func (srv *Server) getCharacteristics(res http.ResponseWriter, req *http.Request
 		}
 		arr = append(arr, cdata)
 
-		c := srv.findC(cdata.Aid, cdata.Iid)
+		c := s.findC(cdata.Aid, cdata.Iid)
 		if c == nil {
 			err = true
 			status := JsonStatusServiceCommunicationFailure
@@ -155,8 +155,8 @@ func (srv *Server) getCharacteristics(res http.ResponseWriter, req *http.Request
 	}
 }
 
-func (srv *Server) putCharacteristics(res http.ResponseWriter, req *http.Request) {
-	if !srv.IsAuthorized(req) {
+func (s *Server) putCharacteristics(res http.ResponseWriter, req *http.Request) {
+	if !s.IsAuthorized(req) {
 		log.Info.Printf("request from %s not authorized\n", req.RemoteAddr)
 		JsonError(res, JsonStatusInsufficientPrivileges)
 		return
@@ -173,12 +173,12 @@ func (srv *Server) putCharacteristics(res http.ResponseWriter, req *http.Request
 		return
 	}
 
-	timedWr := srv.TimedWrite(req)
+	timedWr := s.TimedWrite(req)
 	log.Debug.Println(toJSON(data))
 
 	arr := []*putCharacteristicData{}
 	for _, d := range data.Cs {
-		c := srv.findC(d.Aid, d.Iid)
+		c := s.findC(d.Aid, d.Iid)
 
 		cdata := &putCharacteristicData{
 			Aid: d.Aid,
@@ -242,7 +242,7 @@ func (srv *Server) putCharacteristics(res http.ResponseWriter, req *http.Request
 		}
 	}
 
-	srv.DelTimedWrite(req)
+	s.DelTimedWrite(req)
 
 	if len(arr) == 0 {
 		res.WriteHeader(http.StatusNoContent)
@@ -257,10 +257,10 @@ func (srv *Server) putCharacteristics(res http.ResponseWriter, req *http.Request
 	JsonMultiStatus(res, resp)
 }
 
-func (srv *Server) findC(aid, iid uint64) *characteristic.C {
+func (s *Server) findC(aid, iid uint64) *characteristic.C {
 	var as []*accessory.A
-	as = append(as, srv.a)
-	as = append(as, srv.as[:]...)
+	as = append(as, s.a)
+	as = append(as, s.as[:]...)
 
 	for _, a := range as {
 		if a.Id == aid {
@@ -277,8 +277,8 @@ func (srv *Server) findC(aid, iid uint64) *characteristic.C {
 	return nil
 }
 
-func (srv *Server) prepareCharacteristics(res http.ResponseWriter, req *http.Request) {
-	if !srv.IsAuthorized(req) {
+func (s *Server) prepareCharacteristics(res http.ResponseWriter, req *http.Request) {
+	if !s.IsAuthorized(req) {
 		log.Info.Printf("request from %s not authorized\n", req.RemoteAddr)
 		JsonError(res, JsonStatusInsufficientPrivileges)
 		return
@@ -295,7 +295,7 @@ func (srv *Server) prepareCharacteristics(res http.ResponseWriter, req *http.Req
 		return
 	}
 
-	srv.SetTimedWrite(data.Ttl, data.Pid, req)
+	s.SetTimedWrite(data.Ttl, data.Pid, req)
 
 	resp := struct {
 		Status int `json:"status"`

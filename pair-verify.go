@@ -28,7 +28,7 @@ type pairVerifySession struct {
 	EncryptionKey  [32]byte
 }
 
-func (srv *Server) pairVerify(res http.ResponseWriter, req *http.Request) {
+func (s *Server) pairVerify(res http.ResponseWriter, req *http.Request) {
 	data := pairVerifyPayload{}
 	if err := tlv8.UnmarshalReader(req.Body, &data); err != nil {
 		log.Info.Println("tlv8:", err)
@@ -40,9 +40,9 @@ func (srv *Server) pairVerify(res http.ResponseWriter, req *http.Request) {
 	case MethodPair:
 		switch data.State {
 		case M1:
-			srv.pairVerifyM1(res, req, data)
+			s.pairVerifyM1(res, req, data)
 		case M3:
-			srv.pairVerifyM3(res, req, data)
+			s.pairVerifyM3(res, req, data)
 		default:
 			log.Info.Println("invalid state", data.State)
 			res.WriteHeader(http.StatusBadRequest)
@@ -56,7 +56,7 @@ func (srv *Server) pairVerify(res http.ResponseWriter, req *http.Request) {
 
 }
 
-func (srv *Server) pairVerifyM1(res http.ResponseWriter, req *http.Request, data pairVerifyPayload) {
+func (s *Server) pairVerifyM1(res http.ResponseWriter, req *http.Request, data pairVerifyPayload) {
 	var otherPublicKey [32]byte
 	copy(otherPublicKey[:], data.PublicKey)
 
@@ -73,9 +73,9 @@ func (srv *Server) pairVerifyM1(res http.ResponseWriter, req *http.Request, data
 
 	var buf []byte
 	buf = append(buf, publicKey[:]...)
-	buf = append(buf, srv.uuid...)
+	buf = append(buf, s.uuid...)
 	buf = append(buf, data.PublicKey[:]...)
-	signature, err := ed25519.Signature(srv.Key.Private[:], buf)
+	signature, err := ed25519.Signature(s.Key.Private[:], buf)
 	if err != nil {
 		log.Info.Println(err)
 		tlv8Error(res, M2, TlvErrorUnknown)
@@ -86,7 +86,7 @@ func (srv *Server) pairVerifyM1(res http.ResponseWriter, req *http.Request, data
 		Identifier string `tlv8:"1"`
 		Signature  []byte `tlv8:"10"`
 	}{
-		Identifier: srv.uuid,
+		Identifier: s.uuid,
 		Signature:  signature,
 	}
 
@@ -118,12 +118,12 @@ func (srv *Server) pairVerifyM1(res http.ResponseWriter, req *http.Request, data
 		SharedKey:      sharedKey,
 		EncryptionKey:  encKey,
 	}
-	srv.setSession(req.RemoteAddr, ses)
+	s.setSession(req.RemoteAddr, ses)
 }
 
-func (srv *Server) pairVerifyM3(res http.ResponseWriter, req *http.Request, data pairVerifyPayload) {
+func (s *Server) pairVerifyM3(res http.ResponseWriter, req *http.Request, data pairVerifyPayload) {
 	// Get the session for the request.
-	ses, err := srv.getPairVerifySession(req.RemoteAddr)
+	ses, err := s.getPairVerifySession(req.RemoteAddr)
 	if err != nil {
 		log.Info.Println(err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -149,7 +149,7 @@ func (srv *Server) pairVerifyM3(res http.ResponseWriter, req *http.Request, data
 		return
 	}
 
-	pairing, err := srv.st.Pairing(encData.Identifier)
+	pairing, err := s.st.Pairing(encData.Identifier)
 	if err != nil {
 		log.Info.Printf("not paired with %s yet\n", encData.Identifier)
 		tlv8Error(res, M4, TlvErrorAuthentication)
@@ -182,7 +182,7 @@ func (srv *Server) pairVerifyM3(res http.ResponseWriter, req *http.Request, data
 	}
 
 	// Store the session for the request.
-	srv.setSession(req.RemoteAddr, ss)
+	s.setSession(req.RemoteAddr, ss)
 
 	conn := getConn(req)
 	if conn == nil {

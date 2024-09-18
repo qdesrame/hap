@@ -14,14 +14,14 @@ type pairingPayload struct {
 	Permission byte   `tlv8:"11"`
 }
 
-func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
-	if !srv.IsAuthorized(req) {
+func (s *Server) pairings(res http.ResponseWriter, req *http.Request) {
+	if !s.IsAuthorized(req) {
 		log.Info.Printf("request from %s not authorized\n", req.RemoteAddr)
 		JsonError(res, JsonStatusInsufficientPrivileges)
 		return
 	}
 
-	ss, err := srv.getSession(req.RemoteAddr)
+	ss, err := s.getSession(req.RemoteAddr)
 	if err != nil {
 		log.Info.Println(err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -54,7 +54,7 @@ func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		p, err := srv.st.Pairing(d.Identifier)
+		p, err := s.st.Pairing(d.Identifier)
 		if err != nil {
 			p = Pairing{
 				Name:       d.Identifier,
@@ -71,7 +71,7 @@ func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
 			p.Permission = d.Permission
 		}
 
-		err = srv.savePairing(p)
+		err = s.savePairing(p)
 		if err != nil {
 			log.Info.Println(err)
 			tlv8Error(res, M2, TlvErrorUnknown)
@@ -94,14 +94,14 @@ func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		p, err := srv.st.Pairing(d.Identifier)
+		p, err := s.st.Pairing(d.Identifier)
 		if err != nil {
 			log.Info.Println(err)
 			tlv8Error(res, M2, TlvErrorUnknown)
 			return
 		}
 
-		if err = srv.deletePairing(p); err != nil {
+		if err = s.deletePairing(p); err != nil {
 			log.Info.Println(err)
 			tlv8Error(res, M2, TlvErrorUnknown)
 			return
@@ -116,17 +116,17 @@ func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
 
 		// If no admin controller is paired anymore,
 		// close all connections and delete all pairings
-		if !srv.pairedWithAdmin() {
+		if !s.pairedWithAdmin() {
 			for addr, conn := range conns() {
 				log.Debug.Println("Closing connection to", addr)
 				conn.Close()
 			}
-			srv.deleteAllPairings()
+			s.deleteAllPairings()
 		}
 
 		// Close connection of deleted controller
 		for addr, conn := range conns() {
-			ss, err := srv.getSession(addr)
+			ss, err := s.getSession(addr)
 			if err != nil {
 				log.Debug.Println("no session for", addr, err)
 				continue
@@ -139,7 +139,7 @@ func (srv *Server) pairings(res http.ResponseWriter, req *http.Request) {
 
 	case MethodListPairings:
 		log.Debug.Println("list pairings")
-		ps := srv.st.Pairings()
+		ps := s.st.Pairings()
 		resp := make([]pairingPayload, len(ps))
 		for i, p := range ps {
 			resp[i] = pairingPayload{

@@ -36,16 +36,16 @@ type pairSetupPayload struct {
 	FragmentLast  []byte `tlv8:"14,optional"`
 }
 
-func (srv *Server) pairSetup(res http.ResponseWriter, req *http.Request) {
+func (s *Server) pairSetup(res http.ResponseWriter, req *http.Request) {
 	// pairing is only allowed if the accessory is not paired yet
-	if srv.IsPaired() {
+	if s.IsPaired() {
 		log.Info.Println("pairing is not allowed")
 		tlv8Error(res, M2, TlvErrorUnavailable)
 		return
 	}
 
 	// pair-setup can only be run by one controller simultaneously
-	for addr, _ := range srv.sessions() {
+	for addr, _ := range s.sessions() {
 		if addr != req.RemoteAddr {
 			log.Info.Printf("simulatenous pairings are not allowed")
 			tlv8Error(res, M2, TlvErrorBusy)
@@ -65,11 +65,11 @@ func (srv *Server) pairSetup(res http.ResponseWriter, req *http.Request) {
 	case MethodPair:
 		switch data.State {
 		case M1:
-			srv.pairSetupM1(res, req, data)
+			s.pairSetupM1(res, req, data)
 		case M3:
-			srv.pairSetupM3(res, req, data)
+			s.pairSetupM3(res, req, data)
 		case M5:
-			srv.pairSetupM5(res, req, data)
+			s.pairSetupM5(res, req, data)
 		default:
 			log.Info.Println("invalid state", data.State)
 			res.WriteHeader(http.StatusBadRequest)
@@ -107,15 +107,15 @@ type pairSetupM6Payload struct {
 	State         byte   `tlv8:"6"`
 }
 
-func (srv *Server) pairSetupM1(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
+func (s *Server) pairSetupM1(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
 	// Create a new session.
-	ss, err := newPairSetupSession(srv.uuid, srv.fmtPin())
+	ss, err := newPairSetupSession(s.uuid, s.fmtPin())
 	if err != nil {
 		res.WriteHeader(http.StatusInternalServerError)
 		tlv8Error(res, M2, TlvErrorUnknown)
 		return
 	}
-	srv.setSession(req.RemoteAddr, ss)
+	s.setSession(req.RemoteAddr, ss)
 
 	resp := pairSetupM2Payload{
 		Salt:      ss.Salt,
@@ -125,8 +125,8 @@ func (srv *Server) pairSetupM1(res http.ResponseWriter, req *http.Request, data 
 	tlv8OK(res, resp)
 }
 
-func (srv *Server) pairSetupM3(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
-	ses, err := srv.getPairSetupSession(req.RemoteAddr)
+func (s *Server) pairSetupM3(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
+	ses, err := s.getPairSetupSession(req.RemoteAddr)
 	if err != nil {
 		log.Info.Println(err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -161,8 +161,8 @@ func (srv *Server) pairSetupM3(res http.ResponseWriter, req *http.Request, data 
 	tlv8OK(res, resp)
 }
 
-func (srv *Server) pairSetupM5(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
-	ses, err := srv.getPairSetupSession(req.RemoteAddr)
+func (s *Server) pairSetupM5(res http.ResponseWriter, req *http.Request, data pairSetupPayload) {
+	ses, err := s.getPairSetupSession(req.RemoteAddr)
 	if err != nil {
 		log.Info.Println(err)
 		res.WriteHeader(http.StatusInternalServerError)
@@ -220,9 +220,9 @@ func (srv *Server) pairSetupM5(res http.ResponseWriter, req *http.Request, data 
 	buf = make([]byte, 0)
 	buf = append(buf, hash[:]...)
 	buf = append(buf, ses.Identifier[:]...)
-	buf = append(buf, srv.Key.Public[:]...)
+	buf = append(buf, s.Key.Public[:]...)
 
-	signature, err := ed25519.Signature(srv.Key.Private[:], buf)
+	signature, err := ed25519.Signature(s.Key.Private[:], buf)
 	if err != nil {
 		log.Info.Println(err)
 		tlv8Error(res, M6, TlvErrorInvalidRequest)
@@ -231,7 +231,7 @@ func (srv *Server) pairSetupM5(res http.ResponseWriter, req *http.Request, data 
 
 	privateData := pairSetupM6EncryptedPayload{
 		Identifier: ses.Identifier,
-		PublicKey:  srv.Key.Public[:],
+		PublicKey:  s.Key.Public[:],
 		Signature:  signature,
 	}
 	b, err := tlv8.Marshal(privateData)
@@ -256,5 +256,5 @@ func (srv *Server) pairSetupM5(res http.ResponseWriter, req *http.Request, data 
 		PublicKey:  encData.PublicKey,
 		Permission: PermissionAdmin, // controller is admin by default
 	}
-	srv.savePairing(p)
+	s.savePairing(p)
 }

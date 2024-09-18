@@ -7,16 +7,16 @@ import (
 	"net/http"
 )
 
-func (srv *Server) getAccessories(res http.ResponseWriter, req *http.Request) {
-	if !srv.IsAuthorized(req) {
+func (s *Server) getAccessories(res http.ResponseWriter, req *http.Request) {
+	if !s.IsAuthorized(req) {
 		log.Info.Printf("request from %s not authorized\n", req.RemoteAddr)
 		JsonError(res, JsonStatusInsufficientPrivileges)
 		return
 	}
 
 	var as []*accessory.A
-	as = append(as, srv.a)
-	as = append(as, srv.as[:]...)
+	as = append(as, s.a)
+	as = append(as, s.as[:]...)
 
 	p := struct {
 		Accessories []*accessory.A `json:"accessories"`
